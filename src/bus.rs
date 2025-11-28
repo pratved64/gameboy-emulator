@@ -27,7 +27,7 @@ impl MemoryBus {
 
     pub fn write_word(&mut self, address: u16, value: u16) {
         let low = (value & 0x00FF) as u8;
-        let high = (value & 0xFF00 >> 8) as u8;
+        let high = ((value & 0xFF00) >> 8) as u8;
 
         self.write_byte(address, low);
         self.write_byte(address + 1, high);

@@ -1,5 +1,6 @@
 mod bus;
 mod cpu;
+mod instruction;
 
 use bus::MemoryBus;
 use cpu::CPU;
@@ -8,29 +9,47 @@ fn main() {
     let mut bus = MemoryBus::new();
     let mut cpu = CPU::new();
 
-    let bootrom: [u8; 8] = [0x31, 0xFE, 0xFF, 0x01, 0x34, 0x12, 0xC5, 0xD1];
+    // 1. Initialize SP
+    cpu.sp = 0xFFFE;
+
+    // A simple program:
+    // 0x00: CALL 0x0006  (Jump to func at index 6)
+    // 0x03: 0x02         (Target Address for CALL)
+    // 0x04: 0x00         (Padding / Next instruction)
+    // 0x06: ADD A, 0x10  (The Function: Add 0x10 to A. Wait, we don't have ADD Immediate yet! Let's use XOR A to clear it)
+    // 0x07: RET          (Return)
+
+    // Let's execute:
+    // 1. CALL 0x0004
+    // 2. XOR A (At 0x0004)
+    // 3. RET
+
+    let bootrom: [u8; 6] = [
+        0xCD, 0x04, 0x00, // CALL 0x0004 (3 bytes)
+        0x00, // NOP (Padding to fill space at 0x03)
+        0xAF, // FUNC: XOR A  (Address 0x0004)
+        0xC9, // FUNC: RET    (Address 0x0005)
+    ];
 
     for (i, byte) in bootrom.iter().enumerate() {
         bus.write_byte(i as u16, *byte);
     }
 
-    println!("System initialized, starting CPU...");
+    // Preset A to 0x55 so we can see XOR A clear it
+    cpu.registers.a = 0x55;
+
+    println!("Starting CALL/RET Test...");
 
     for _ in 0..3 {
         println!(
-            "PC {:#06x} | SP {:#06x} | A: {:#04x} | HL: {:#06x}",
-            cpu.pc,
-            cpu.sp,
-            cpu.registers.a,
-            cpu.registers.get_hl()
+            "PC: {:#06x} | SP: {:#06x} | A: {:#04x}",
+            cpu.pc, cpu.sp, cpu.registers.a
         );
-
         cpu.step(&mut bus);
     }
 
-    println!("Final State:");
-    println!("PC: {:#06x}", cpu.pc);
-    println!("SP: {:#06x}", cpu.sp);
-    println!("HL: {:#06x}", cpu.registers.get_hl());
-    println!("A:  {:#04x}", cpu.registers.a);
+    println!(
+        "Final PC: {:#06x} | SP: {:#06x} | A: {:#04x}",
+        cpu.pc, cpu.sp, cpu.registers.a
+    );
 }

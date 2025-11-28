@@ -2,6 +2,7 @@
 //        with Program Counter
 
 use crate::bus::MemoryBus;
+use crate::instruction::{ArithmeticTarget, Instruction, JumpTest, Load16Target, StackTarget};
 
 pub struct CPU {
     pub registers: Registers,
@@ -110,6 +111,34 @@ impl CPU {
                     StackTarget::DE => self.registers.set_de(result),
                     StackTarget::HL => self.registers.set_hl(result),
                     StackTarget::AF => self.registers.set_af(result),
+                }
+            }
+
+            Instruction::CALL(test) => {
+                let target_addr = bus.read_word(self.pc);
+                self.pc = self.pc.wrapping_add(2);
+                if match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true,
+                } {
+                    self.push(bus, self.pc);
+                    self.pc = target_addr;
+                }
+            }
+
+            Instruction::RET(test) => {
+                if match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true,
+                } {
+                    let top = self.pop(bus);
+                    self.pc = top;
                 }
             }
 
@@ -238,84 +267,6 @@ impl std::convert::From<u8> for FlagsRegister {
             subtract,
             half_carry,
             carry,
-        }
-    }
-}
-
-pub enum Instruction {
-    ADD(ArithmeticTarget),
-    XOR(ArithmeticTarget),
-    JP(JumpTest),
-    LD16(Load16Target),
-    PUSH(StackTarget),
-    POP(StackTarget),
-}
-
-pub enum ArithmeticTarget {
-    A,
-    B,
-    C,
-    D,
-    E,
-    H,
-    L,
-}
-
-pub enum JumpTest {
-    NotZero,
-    Zero,
-    NotCarry,
-    Carry,
-    Always,
-}
-
-pub enum Load16Target {
-    BC,
-    DE,
-    HL,
-    SP,
-}
-
-pub enum StackTarget {
-    BC,
-    DE,
-    HL,
-    AF,
-}
-
-impl Instruction {
-    fn from_byte(byte: u8) -> Option<Instruction> {
-        match byte {
-            0x01 => Some(Instruction::LD16(Load16Target::BC)),
-            0x11 => Some(Instruction::LD16(Load16Target::DE)),
-            0x21 => Some(Instruction::LD16(Load16Target::HL)),
-            0x31 => Some(Instruction::LD16(Load16Target::SP)),
-
-            0x80 => Some(Instruction::ADD(ArithmeticTarget::B)),
-            0x81 => Some(Instruction::ADD(ArithmeticTarget::C)),
-            0x82 => Some(Instruction::ADD(ArithmeticTarget::D)),
-            0x83 => Some(Instruction::ADD(ArithmeticTarget::E)),
-            0x84 => Some(Instruction::ADD(ArithmeticTarget::H)),
-            0x85 => Some(Instruction::ADD(ArithmeticTarget::L)),
-            // 0x86 is ADD A, (HL)
-            0x87 => Some(Instruction::ADD(ArithmeticTarget::A)),
-
-            0xC3 => Some(Instruction::JP(JumpTest::Always)),
-            0xC2 => Some(Instruction::JP(JumpTest::NotZero)),
-            0xCA => Some(Instruction::JP(JumpTest::Zero)),
-
-            0xAF => Some(Instruction::XOR(ArithmeticTarget::A)),
-
-            0xC1 => Some(Instruction::POP(StackTarget::BC)),
-            0xD1 => Some(Instruction::POP(StackTarget::DE)),
-            0xE1 => Some(Instruction::POP(StackTarget::HL)),
-            0xF1 => Some(Instruction::POP(StackTarget::AF)),
-
-            0xC5 => Some(Instruction::PUSH(StackTarget::BC)),
-            0xD5 => Some(Instruction::PUSH(StackTarget::DE)),
-            0xE5 => Some(Instruction::PUSH(StackTarget::HL)),
-            0xF5 => Some(Instruction::PUSH(StackTarget::AF)),
-            _ => None,
         }
     }
 }
