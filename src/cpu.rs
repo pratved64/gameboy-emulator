@@ -142,9 +142,119 @@ impl CPU {
                 }
             }
 
-            _ => {
-                // TODO: support more instructions
+            Instruction::LD_HL_DEC_A => {
+                let address = self.registers.get_hl();
+                let value = self.registers.a;
+                bus.write_byte(address, value);
+
+                self.registers.set_hl(address.wrapping_sub(1));
             }
+
+            Instruction::JR(test) => {
+                let offset = bus.read_byte(self.pc) as i8;
+                self.pc = self.pc.wrapping_add(1);
+                if match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true,
+                } {
+                    self.pc = self.pc.wrapping_add(offset as u16);
+                }
+            }
+
+            Instruction::INC(target) => {
+                let value = self.read_reg(&target);
+
+                let new_value = value.wrapping_add(1);
+
+                println!(
+                    "INC {:?} | Old: {} | New: {} | ZeroFlag: {}",
+                    target,
+                    value,
+                    new_value,
+                    new_value == 0,
+                );
+                self.registers.f.zero = new_value == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = (value & 0xF) == 0xF;
+
+                self.write_reg(target, new_value);
+            }
+
+            Instruction::DEC(target) => {
+                let value = self.read_reg(&target);
+                let new_value = value.wrapping_sub(1);
+                self.registers.f.zero = new_value == 0;
+                self.registers.f.subtract = true;
+                self.registers.f.half_carry = (value & 0xF) == 0;
+                self.write_reg(target, new_value);
+            }
+
+            Instruction::INC16(target) => match target {
+                Load16Target::BC => self
+                    .registers
+                    .set_bc(self.registers.get_bc().wrapping_add(1)),
+                Load16Target::DE => self
+                    .registers
+                    .set_de(self.registers.get_de().wrapping_add(1)),
+                Load16Target::HL => self
+                    .registers
+                    .set_hl(self.registers.get_hl().wrapping_add(1)),
+                Load16Target::SP => self.sp = self.sp.wrapping_add(1),
+            },
+
+            Instruction::DEC16(target) => match target {
+                Load16Target::BC => self
+                    .registers
+                    .set_bc(self.registers.get_bc().wrapping_sub(1)),
+                Load16Target::DE => self
+                    .registers
+                    .set_de(self.registers.get_de().wrapping_sub(1)),
+                Load16Target::HL => self
+                    .registers
+                    .set_hl(self.registers.get_hl().wrapping_sub(1)),
+                Load16Target::SP => self.sp = self.sp.wrapping_sub(1),
+            },
+
+            Instruction::BIT(target) => {
+                let value = match target {
+                    ArithmeticTarget::H => self.registers.h,
+                    _ => panic!("BIT target not implemented!"),
+                };
+
+                let result = value & 0x80;
+                self.registers.f.zero = result == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = true;
+            }
+
+            _ => {} // TODO: Support more instructions
+        }
+    }
+
+    fn read_reg(&self, target: &ArithmeticTarget) -> u8 {
+        match target {
+            ArithmeticTarget::A => self.registers.a,
+            ArithmeticTarget::B => self.registers.b,
+            ArithmeticTarget::C => self.registers.c,
+            ArithmeticTarget::D => self.registers.d,
+            ArithmeticTarget::E => self.registers.e,
+            ArithmeticTarget::H => self.registers.h,
+            ArithmeticTarget::L => self.registers.l,
+        }
+    }
+
+    fn write_reg(&mut self, target: ArithmeticTarget, value: u8) {
+        match target {
+            ArithmeticTarget::A => self.registers.a = value,
+            ArithmeticTarget::B => self.registers.b = value,
+            ArithmeticTarget::C => self.registers.c = value,
+            ArithmeticTarget::D => self.registers.d = value,
+            ArithmeticTarget::E => self.registers.e = value,
+            ArithmeticTarget::H => self.registers.h = value,
+            ArithmeticTarget::L => self.registers.l = value,
         }
     }
 
@@ -171,11 +281,23 @@ impl CPU {
     pub fn step(&mut self, bus: &mut MemoryBus) {
         let instruction_byte = bus.read_byte(self.pc);
         self.pc = self.pc.wrapping_add(1);
-        if let Some(instruction) = Instruction::from_byte(instruction_byte) {
-            self.execute(instruction, bus)
-        } else {
-            panic!("Unknown instruction found for: {}", instruction_byte);
-        };
+
+        let instruction = Instruction::from_byte(instruction_byte);
+
+        match instruction {
+            Some(Instruction::PREFIX) => {
+                let cb_byte = bus.read_byte(self.pc);
+                self.pc = self.pc.wrapping_add(1);
+
+                if let Some(cb_inst) = Instruction::from_cb_byte(cb_byte) {
+                    self.execute(cb_inst, bus);
+                } else {
+                    panic!("Unknown CB Instruction: 0xCB{:02x}", cb_byte);
+                }
+            }
+            Some(instr) => self.execute(instr, bus),
+            None => panic!("Unknown instruction"),
+        }
     }
 }
 

@@ -1,14 +1,23 @@
 pub enum Instruction {
     ADD(ArithmeticTarget),
     XOR(ArithmeticTarget),
+    INC(ArithmeticTarget),
+    DEC(ArithmeticTarget),
+    INC16(Load16Target),
+    DEC16(Load16Target),
     JP(JumpTest),
+    JR(JumpTest),
     LD16(Load16Target),
     PUSH(StackTarget),
     POP(StackTarget),
     CALL(JumpTest),
     RET(JumpTest),
+    LD_HL_DEC_A,
+    BIT(ArithmeticTarget),
+    PREFIX,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArithmeticTarget {
     A,
     B,
@@ -19,6 +28,7 @@ pub enum ArithmeticTarget {
     L,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum JumpTest {
     NotZero,
     Zero,
@@ -27,6 +37,7 @@ pub enum JumpTest {
     Always,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Load16Target {
     BC,
     DE,
@@ -34,6 +45,7 @@ pub enum Load16Target {
     SP,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum StackTarget {
     BC,
     DE,
@@ -48,6 +60,36 @@ impl Instruction {
             0x11 => Some(Instruction::LD16(Load16Target::DE)),
             0x21 => Some(Instruction::LD16(Load16Target::HL)),
             0x31 => Some(Instruction::LD16(Load16Target::SP)),
+
+            0x32 => Some(Instruction::LD_HL_DEC_A),
+
+            0x18 => Some(Instruction::JR(JumpTest::Always)),
+
+            0x03 => Some(Instruction::INC16(Load16Target::BC)),
+            0x13 => Some(Instruction::INC16(Load16Target::DE)),
+            0x23 => Some(Instruction::INC16(Load16Target::HL)),
+            0x33 => Some(Instruction::INC16(Load16Target::SP)),
+
+            0x0B => Some(Instruction::DEC16(Load16Target::BC)),
+            0x1B => Some(Instruction::DEC16(Load16Target::DE)),
+            0x2B => Some(Instruction::DEC16(Load16Target::HL)),
+            0x3B => Some(Instruction::DEC16(Load16Target::SP)),
+
+            0x3C => Some(Instruction::INC(ArithmeticTarget::A)),
+            0x04 => Some(Instruction::INC(ArithmeticTarget::B)),
+            0x0C => Some(Instruction::INC(ArithmeticTarget::C)),
+            0x14 => Some(Instruction::INC(ArithmeticTarget::D)),
+            0x1C => Some(Instruction::INC(ArithmeticTarget::E)),
+            0x24 => Some(Instruction::INC(ArithmeticTarget::H)),
+            0x2C => Some(Instruction::INC(ArithmeticTarget::L)),
+
+            0x3D => Some(Instruction::DEC(ArithmeticTarget::A)),
+            0x05 => Some(Instruction::DEC(ArithmeticTarget::B)),
+            0x0D => Some(Instruction::DEC(ArithmeticTarget::C)),
+            0x15 => Some(Instruction::DEC(ArithmeticTarget::D)),
+            0x1D => Some(Instruction::DEC(ArithmeticTarget::E)),
+            0x25 => Some(Instruction::DEC(ArithmeticTarget::H)),
+            0x2D => Some(Instruction::DEC(ArithmeticTarget::L)),
 
             0x80 => Some(Instruction::ADD(ArithmeticTarget::B)),
             0x81 => Some(Instruction::ADD(ArithmeticTarget::C)),
@@ -91,6 +133,13 @@ impl Instruction {
             0xC8 => Some(Instruction::RET(JumpTest::Zero)),
             0xD0 => Some(Instruction::RET(JumpTest::NotCarry)),
             0xD8 => Some(Instruction::RET(JumpTest::Carry)),
+            _ => None,
+        }
+    }
+
+    pub fn from_cb_byte(byte: u8) -> Option<Instruction> {
+        match byte {
+            0x7C => Some(Instruction::BIT(ArithmeticTarget::H)),
             _ => None,
         }
     }

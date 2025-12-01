@@ -1,20 +1,30 @@
+use crate::ppu::PPU;
+
 pub struct MemoryBus {
     memory: [u8; 0x10000],
+    ppu: PPU,
 }
 
 impl MemoryBus {
     pub fn new() -> Self {
         MemoryBus {
             memory: [0; 0x10000],
+            ppu: PPU { vram: [0; 0x2000] },
         }
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
-        self.memory[address as usize]
+        match address {
+            0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize],
+            _ => self.memory[address as usize],
+        }
     }
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
-        self.memory[address as usize] = byte;
+        match address {
+            0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize] = byte,
+            _ => self.memory[address as usize] = byte,
+        }
     }
 
     // little endian, read low byte then high

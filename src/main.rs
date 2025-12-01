@@ -1,6 +1,7 @@
 mod bus;
 mod cpu;
 mod instruction;
+mod ppu;
 
 use bus::MemoryBus;
 use cpu::CPU;
@@ -9,47 +10,32 @@ fn main() {
     let mut bus = MemoryBus::new();
     let mut cpu = CPU::new();
 
-    // 1. Initialize SP
-    cpu.sp = 0xFFFE;
+    println!("Test: BIT 7, H");
 
-    // A simple program:
-    // 0x00: CALL 0x0006  (Jump to func at index 6)
-    // 0x03: 0x02         (Target Address for CALL)
-    // 0x04: 0x00         (Padding / Next instruction)
-    // 0x06: ADD A, 0x10  (The Function: Add 0x10 to A. Wait, we don't have ADD Immediate yet! Let's use XOR A to clear it)
-    // 0x07: RET          (Return)
+    // Case 1: H = 0x80 (Bit 7 is Set)
+    cpu.registers.h = 0x80;
+    // Inject: PREFIX (0xCB) then BIT 7, H (0x7C)
+    bus.write_byte(0x00, 0xCB);
+    bus.write_byte(0x01, 0x7C);
 
-    // Let's execute:
-    // 1. CALL 0x0004
-    // 2. XOR A (At 0x0004)
-    // 3. RET
+    cpu.step(&mut bus);
+    let z_flag_set = cpu.registers.f.zero;
+    println!("H=0x80 | Zero Flag: {} (Expected: false)", z_flag_set);
 
-    let bootrom: [u8; 6] = [
-        0xCD, 0x04, 0x00, // CALL 0x0004 (3 bytes)
-        0x00, // NOP (Padding to fill space at 0x03)
-        0xAF, // FUNC: XOR A  (Address 0x0004)
-        0xC9, // FUNC: RET    (Address 0x0005)
-    ];
+    // Case 2: H = 0x7F (Bit 7 is Cleared -> 0111 1111)
+    cpu.registers.h = 0x7F;
+    cpu.pc = 0x00; // Reset PC to run the same instruction again
+    // (Memory still contains 0xCB, 0x7C)
 
-    for (i, byte) in bootrom.iter().enumerate() {
-        bus.write_byte(i as u16, *byte);
+    cpu.step(&mut bus);
+    let z_flag_clear = cpu.registers.f.zero;
+    println!("H=0x7F | Zero Flag: {} (Expected: true)", z_flag_clear);
+
+    if !z_flag_set && z_flag_clear {
+        println!("✅ SUCCESS: Prefix CB decoding and BIT logic working.");
+    } else {
+        println!("❌ FAIL: Check your logic.");
     }
 
-    // Preset A to 0x55 so we can see XOR A clear it
-    cpu.registers.a = 0x55;
-
-    println!("Starting CALL/RET Test...");
-
-    for _ in 0..3 {
-        println!(
-            "PC: {:#06x} | SP: {:#06x} | A: {:#04x}",
-            cpu.pc, cpu.sp, cpu.registers.a
-        );
-        cpu.step(&mut bus);
-    }
-
-    println!(
-        "Final PC: {:#06x} | SP: {:#06x} | A: {:#04x}",
-        cpu.pc, cpu.sp, cpu.registers.a
-    );
+    // debug unknown instruction
 }
