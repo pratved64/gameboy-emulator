@@ -16,6 +16,11 @@ impl MemoryBus {
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize],
+            0xFF00..=0xFF7F => {
+                println!("Read from 0x{:x}", address);
+                0x000000
+            }
+
             _ => self.memory[address as usize],
         }
     }
@@ -23,6 +28,7 @@ impl MemoryBus {
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize] = byte,
+            0xFF00..=0xFF7F => println!("Write to 0x{:x}", address),
             _ => self.memory[address as usize] = byte,
         }
     }

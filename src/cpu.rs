@@ -39,9 +39,44 @@ impl CPU {
                     ArithmeticTarget::E => self.registers.e,
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
                 };
                 let result = self.add(value);
                 self.registers.a = result;
+            }
+
+            Instruction::SUB(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                };
+                let result = self.sub(value);
+                self.registers.a = result;
+            }
+
+            Instruction::CP(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                };
+
+                let (new_value, overflow) = self.registers.a.overflowing_sub(value);
+                self.registers.f.zero = new_value == 0;
+                self.registers.f.subtract = true;
+                self.registers.f.carry = overflow;
+                self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF);
             }
 
             Instruction::JP(test) => {
@@ -70,6 +105,7 @@ impl CPU {
                     ArithmeticTarget::E => self.registers.e,
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
                 };
 
                 let result = self.registers.a ^ value;
@@ -79,6 +115,30 @@ impl CPU {
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = false;
                 self.registers.f.carry = false;
+            }
+
+            Instruction::LD(dest, source) => {
+                let load_value = match source {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                };
+
+                match dest {
+                    ArithmeticTarget::A => self.registers.a = load_value,
+                    ArithmeticTarget::B => self.registers.b = load_value,
+                    ArithmeticTarget::C => self.registers.c = load_value,
+                    ArithmeticTarget::D => self.registers.d = load_value,
+                    ArithmeticTarget::E => self.registers.e = load_value,
+                    ArithmeticTarget::H => self.registers.h = load_value,
+                    ArithmeticTarget::L => self.registers.l = load_value,
+                    ArithmeticTarget::HL => bus.write_byte(self.registers.get_hl(), load_value),
+                }
             }
 
             Instruction::LD16(target) => {
@@ -243,6 +303,10 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e,
             ArithmeticTarget::H => self.registers.h,
             ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::HL => {
+                println!("Reading from HL using read_reg!");
+                0x000000
+            }
         }
     }
 
@@ -255,6 +319,7 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e = value,
             ArithmeticTarget::H => self.registers.h = value,
             ArithmeticTarget::L => self.registers.l = value,
+            ArithmeticTarget::HL => println!("Writing to HL register from write_reg!"),
         }
     }
 
@@ -264,6 +329,15 @@ impl CPU {
         self.registers.f.subtract = false;
         self.registers.f.carry = overflow;
         self.registers.f.half_carry = (self.registers.a & 0xF) + (value & 0xF) > 0xF;
+        new_value
+    }
+
+    fn sub(&mut self, value: u8) -> u8 {
+        let (new_value, overflow) = self.registers.a.overflowing_sub(value);
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = true;
+        self.registers.f.carry = overflow;
+        self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF);
         new_value
     }
 
