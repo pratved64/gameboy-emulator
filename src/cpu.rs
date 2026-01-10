@@ -72,6 +72,27 @@ impl CPU {
                 self.registers.a = result;
             }
 
+            Instruction::SBC(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
+                    _ => panic!("Unknown target for SUB!"),
+                };
+                let result = self.sbc(value);
+                self.registers.a = result;
+            }
+
             Instruction::CP(target) => {
                 let value = match target {
                     ArithmeticTarget::A => self.registers.a,
@@ -210,7 +231,7 @@ impl CPU {
                     ArithmeticTarget::DE => bus.read_byte(self.registers.get_de()),
                     ArithmeticTarget::D16 => {
                         let address = bus.read_word(self.pc);
-                        self.pc = self.pc.wrapping_add(1);
+                        self.pc = self.pc.wrapping_add(2);
                         bus.read_byte(address)
                     }
                 };
@@ -452,6 +473,21 @@ impl CPU {
         self.registers.f.carry = overflow;
         self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF);
         new_value
+    }
+
+    fn sbc(&mut self, value: u8) -> u8 {
+        let a = self.registers.a;
+        let carry = if self.registers.f.carry { 1 } else { 0 };
+
+        let (res1, borr1) = a.overflowing_sub(value);
+        let (result, borrow) = res1.overflowing_sub(carry);
+
+        self.registers.f.zero = result == 0;
+        self.registers.f.subtract = true;
+        self.registers.f.carry = borr1 || borrow;
+        self.registers.f.half_carry = (a & 0xF) < (value & 0xF) + carry;
+
+        result
     }
 
     fn push(&mut self, bus: &mut MemoryBus, value: u16) {

@@ -16,7 +16,10 @@ impl MemoryBus {
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize],
-            0xFF44 => 0x90,
+            0xFF44 => {
+                println!("Reading LY: 0x90");
+                0x90
+            }
             0xFF00..=0xFF7F => {
                 println!("Read from 0x{:x}", address);
                 0x000000

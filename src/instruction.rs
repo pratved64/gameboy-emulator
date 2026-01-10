@@ -1,6 +1,7 @@
 pub enum Instruction {
     ADD(ArithmeticTarget),
     SUB(ArithmeticTarget),
+    SBC(ArithmeticTarget),
     CP(ArithmeticTarget),
     XOR(ArithmeticTarget),
     INC(ArithmeticTarget),
@@ -96,8 +97,10 @@ impl Instruction {
             0x3B => Some(Instruction::DEC16(Load16Target::SP)),
 
             0x0E => Some(Instruction::LD(ArithmeticTarget::C, ArithmeticTarget::D8)),
+            0x16 => Some(Instruction::LD(ArithmeticTarget::D, ArithmeticTarget::D8)),
+            0x1E => Some(Instruction::LD(ArithmeticTarget::E, ArithmeticTarget::D8)),
+            0x2E => Some(Instruction::LD(ArithmeticTarget::L, ArithmeticTarget::D8)),
             0x3E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::D8)),
-
             0x06 => Some(Instruction::LD(ArithmeticTarget::B, ArithmeticTarget::D8)),
 
             0x02 => Some(Instruction::LD(ArithmeticTarget::BC, ArithmeticTarget::A)),
@@ -213,13 +216,23 @@ impl Instruction {
             // 0x96 is SUB A, (HL)
             0x97 => Some(Instruction::SUB(ArithmeticTarget::A)),
 
+            0x98 => Some(Instruction::SBC(ArithmeticTarget::B)),
+            0x99 => Some(Instruction::SBC(ArithmeticTarget::C)),
+            0x9A => Some(Instruction::SBC(ArithmeticTarget::D)),
+            0x9B => Some(Instruction::SBC(ArithmeticTarget::E)),
+            0x9C => Some(Instruction::SBC(ArithmeticTarget::H)),
+            0x9D => Some(Instruction::SBC(ArithmeticTarget::L)),
+            0x9E => Some(Instruction::SBC(ArithmeticTarget::HL)),
+            0x9F => Some(Instruction::SBC(ArithmeticTarget::A)),
+            0xDE => Some(Instruction::SBC(ArithmeticTarget::D8)),
+
             0xB8 => Some(Instruction::CP(ArithmeticTarget::B)),
             0xB9 => Some(Instruction::CP(ArithmeticTarget::C)),
             0xBA => Some(Instruction::CP(ArithmeticTarget::D)),
             0xBB => Some(Instruction::CP(ArithmeticTarget::E)),
             0xBC => Some(Instruction::CP(ArithmeticTarget::H)),
             0xBD => Some(Instruction::CP(ArithmeticTarget::L)),
-            // 0xBE is CP A, (HL)
+            0xBE => Some(Instruction::CP(ArithmeticTarget::HL)),
             0xBF => Some(Instruction::CP(ArithmeticTarget::A)),
 
             0xFE => Some(Instruction::CP(ArithmeticTarget::D8)),

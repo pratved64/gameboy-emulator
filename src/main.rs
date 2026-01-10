@@ -8,6 +8,10 @@ use cpu::CPU;
 use std::error::Error;
 use std::fs;
 
+// Bootrom maybe working!
+// TODO: Test the emulator with a gb ROM and see what happens
+// Expected: The PC should continue past 0x0100 and not get stuck in this infinite loop!
+
 fn main() -> Result<(), Box<dyn Error>> {
     let mut bus = MemoryBus::new();
     let mut cpu = CPU::new();
@@ -23,12 +27,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         bootrom.len()
     );
 
+    let mut executed_count = 0;
+
     loop {
         cpu.step(&mut bus);
-
+        executed_count += 1;
         if cpu.pc >= 0x0100 {
             println!("Bootrom execution finished!");
             break;
+        }
+        if executed_count > 50000 {
+            println!("Exceeded 50,000 steps!");
+            println!("PC: {:#06x}", cpu.pc);
+            break;
+        } else if executed_count >= 49000 {
+            println!(
+                "PC: {:#06x} | A: {:#06x} | Carry: {}",
+                cpu.pc, cpu.registers.a, cpu.registers.f.carry
+            );
         }
     }
 
