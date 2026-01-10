@@ -45,6 +45,7 @@ impl CPU {
                         self.pc = self.pc.wrapping_add(1);
                         d8_val
                     }
+                    _ => panic!("Unknown target for ADD!"),
                 };
                 let result = self.add(value);
                 self.registers.a = result;
@@ -65,6 +66,7 @@ impl CPU {
                         self.pc = self.pc.wrapping_add(1);
                         d8_val
                     }
+                    _ => panic!("Unknown target for SUB!"),
                 };
                 let result = self.sub(value);
                 self.registers.a = result;
@@ -85,6 +87,7 @@ impl CPU {
                         self.pc = self.pc.wrapping_add(1);
                         d8_val
                     }
+                    _ => panic!("Unknown target for CP!"),
                 };
 
                 let (new_value, overflow) = self.registers.a.overflowing_sub(value);
@@ -166,6 +169,7 @@ impl CPU {
                         self.pc = self.pc.wrapping_add(1);
                         d8_val
                     }
+                    _ => panic!("Unknown target for XOR!"),
                 };
 
                 let result = self.registers.a ^ value;
@@ -192,6 +196,23 @@ impl CPU {
                         self.pc = self.pc.wrapping_add(1);
                         d8_val
                     }
+                    ArithmeticTarget::FFC => {
+                        let address = 0xFF00 + (self.registers.c as u16);
+                        bus.read_byte(address)
+                    }
+                    ArithmeticTarget::FFD8 => {
+                        let addr_byte = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        let address = 0xFF00 + (addr_byte as u16);
+                        bus.read_byte(address)
+                    }
+                    ArithmeticTarget::BC => bus.read_byte(self.registers.get_bc()),
+                    ArithmeticTarget::DE => bus.read_byte(self.registers.get_de()),
+                    ArithmeticTarget::D16 => {
+                        let address = bus.read_word(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        bus.read_byte(address)
+                    }
                 };
 
                 match dest {
@@ -203,6 +224,23 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h = load_value,
                     ArithmeticTarget::L => self.registers.l = load_value,
                     ArithmeticTarget::HL => bus.write_byte(self.registers.get_hl(), load_value),
+                    ArithmeticTarget::FFC => {
+                        let address = 0xFF00 + (self.registers.c as u16);
+                        bus.write_byte(address, load_value);
+                    }
+                    ArithmeticTarget::FFD8 => {
+                        let addr_byte = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        let address = 0xFF00 + (addr_byte as u16);
+                        bus.write_byte(address, load_value);
+                    }
+                    ArithmeticTarget::BC => bus.write_byte(self.registers.get_bc(), load_value),
+                    ArithmeticTarget::DE => bus.write_byte(self.registers.get_de(), load_value),
+                    ArithmeticTarget::D16 => {
+                        let address = bus.read_word(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        bus.write_byte(address, load_value);
+                    }
                     _ => panic!("Unknown WRITE target for LD!"),
                 }
             }
@@ -445,7 +483,10 @@ impl CPU {
                 }
             }
             Some(instr) => self.execute(instr, bus),
-            None => panic!("Unknown instruction from byte: 0x{:02x}", instruction_byte),
+            None => {
+                println!("Program Counter: {}", self.pc);
+                panic!("Unknown instruction from byte: 0x{:02X}", instruction_byte)
+            }
         }
     }
 }

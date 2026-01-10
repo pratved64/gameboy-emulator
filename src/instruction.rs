@@ -34,6 +34,11 @@ pub enum ArithmeticTarget {
     L,
     HL,
     D8,
+    D16,
+    FFC,
+    FFD8,
+    BC,
+    DE,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -92,6 +97,13 @@ impl Instruction {
 
             0x0E => Some(Instruction::LD(ArithmeticTarget::C, ArithmeticTarget::D8)),
             0x3E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::D8)),
+
+            0x06 => Some(Instruction::LD(ArithmeticTarget::B, ArithmeticTarget::D8)),
+
+            0x02 => Some(Instruction::LD(ArithmeticTarget::BC, ArithmeticTarget::A)),
+            0x0A => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::BC)),
+            0x12 => Some(Instruction::LD(ArithmeticTarget::DE, ArithmeticTarget::A)),
+            0x1A => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::DE)),
 
             0x40 => Some(Instruction::LD(ArithmeticTarget::B, ArithmeticTarget::B)),
             0x41 => Some(Instruction::LD(ArithmeticTarget::B, ArithmeticTarget::C)),
@@ -165,6 +177,8 @@ impl Instruction {
             // 0x7E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::HL)),
             0x7F => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::A)),
 
+            0xEA => Some(Instruction::LD(ArithmeticTarget::D16, ArithmeticTarget::A)),
+
             0x3C => Some(Instruction::INC(ArithmeticTarget::A)),
             0x04 => Some(Instruction::INC(ArithmeticTarget::B)),
             0x0C => Some(Instruction::INC(ArithmeticTarget::C)),
@@ -208,6 +222,8 @@ impl Instruction {
             // 0xBE is CP A, (HL)
             0xBF => Some(Instruction::CP(ArithmeticTarget::A)),
 
+            0xFE => Some(Instruction::CP(ArithmeticTarget::D8)),
+
             0xC3 => Some(Instruction::JP(JumpTest::Always)),
             0xC2 => Some(Instruction::JP(JumpTest::NotZero)),
             0xCA => Some(Instruction::JP(JumpTest::Zero)),
@@ -241,6 +257,11 @@ impl Instruction {
             0xC8 => Some(Instruction::RET(JumpTest::Zero)),
             0xD0 => Some(Instruction::RET(JumpTest::NotCarry)),
             0xD8 => Some(Instruction::RET(JumpTest::Carry)),
+
+            0xE0 => Some(Instruction::LD(ArithmeticTarget::FFD8, ArithmeticTarget::A)),
+            0xF0 => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::FFD8)),
+            0xE2 => Some(Instruction::LD(ArithmeticTarget::FFC, ArithmeticTarget::A)),
+            0xF2 => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::FFC)),
 
             0xCB => Some(Instruction::PREFIX),
             _ => None,
