@@ -40,6 +40,11 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
                     ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
                 };
                 let result = self.add(value);
                 self.registers.a = result;
@@ -55,6 +60,11 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
                     ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
                 };
                 let result = self.sub(value);
                 self.registers.a = result;
@@ -70,6 +80,11 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
                     ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
                 };
 
                 let (new_value, overflow) = self.registers.a.overflowing_sub(value);
@@ -77,6 +92,46 @@ impl CPU {
                 self.registers.f.subtract = true;
                 self.registers.f.carry = overflow;
                 self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF);
+            }
+
+            Instruction::RL(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    _ => panic!("Unknown target for Instruction RL!"),
+                };
+
+                let top_bit = value & 0x80;
+                let new_value = (value << 1) | (self.registers.f.carry as u8);
+                self.registers.f.carry = top_bit != 0;
+
+                self.registers.f.zero = new_value == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = false;
+                self.write_reg(target, new_value);
+            }
+
+            // Rotate the contents of register A to the left, through the carry (CY) flag.
+            // That is, the contents of bit 0 are copied to bit 1, and the previous contents
+            // of bit 1 (before the copy operation) are copied to bit 2.
+            // The same operation is repeated in sequence for the rest of the register.
+            // The previous contents of the carry flag are copied to bit 0
+            Instruction::RLA => {
+                let value = self.registers.a;
+                let top_bit = value & 0x80;
+                let new_value = (value << 1) | (self.registers.f.carry as u8);
+                self.registers.f.carry = top_bit != 0;
+
+                self.registers.f.zero = false;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = false;
+                self.write_reg(ArithmeticTarget::A, new_value);
             }
 
             Instruction::JP(test) => {
@@ -106,6 +161,11 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
                     ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
                 };
 
                 let result = self.registers.a ^ value;
@@ -127,6 +187,11 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h,
                     ArithmeticTarget::L => self.registers.l,
                     ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
                 };
 
                 match dest {
@@ -138,6 +203,7 @@ impl CPU {
                     ArithmeticTarget::H => self.registers.h = load_value,
                     ArithmeticTarget::L => self.registers.l = load_value,
                     ArithmeticTarget::HL => bus.write_byte(self.registers.get_hl(), load_value),
+                    _ => panic!("Unknown WRITE target for LD!"),
                 }
             }
 
@@ -208,6 +274,13 @@ impl CPU {
                 bus.write_byte(address, value);
 
                 self.registers.set_hl(address.wrapping_sub(1));
+            }
+
+            Instruction::LD_HL_INC_A => {
+                let address = self.registers.get_hl();
+                let value = self.registers.a;
+                bus.write_byte(address, value);
+                self.registers.set_hl(address.wrapping_add(1));
             }
 
             Instruction::JR(test) => {
@@ -307,6 +380,7 @@ impl CPU {
                 println!("Reading from HL using read_reg!");
                 0x000000
             }
+            _ => panic!("Trying to read from unknown register!"),
         }
     }
 
@@ -320,6 +394,7 @@ impl CPU {
             ArithmeticTarget::H => self.registers.h = value,
             ArithmeticTarget::L => self.registers.l = value,
             ArithmeticTarget::HL => println!("Writing to HL register from write_reg!"),
+            _ => panic!("Trying to write to unknown register!"),
         }
     }
 
@@ -370,7 +445,7 @@ impl CPU {
                 }
             }
             Some(instr) => self.execute(instr, bus),
-            None => panic!("Unknown instruction"),
+            None => panic!("Unknown instruction from byte: 0x{:02x}", instruction_byte),
         }
     }
 }

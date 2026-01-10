@@ -5,37 +5,46 @@ mod ppu;
 
 use bus::MemoryBus;
 use cpu::CPU;
+use std::error::Error;
+use std::fs;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut bus = MemoryBus::new();
     let mut cpu = CPU::new();
 
-    println!("Test: BIT 7, H");
+    let bootrom: Vec<u8> = fs::read("dmg_boot.bin")?;
 
-    // Case 1: H = 0x80 (Bit 7 is Set)
-    cpu.registers.h = 0x80;
-    // Inject: PREFIX (0xCB) then BIT 7, H (0x7C)
-    bus.write_byte(0x00, 0xCB);
-    bus.write_byte(0x01, 0x7C);
-
-    cpu.step(&mut bus);
-    let z_flag_set = cpu.registers.f.zero;
-    println!("H=0x80 | Zero Flag: {} (Expected: false)", z_flag_set);
-
-    // Case 2: H = 0x7F (Bit 7 is Cleared -> 0111 1111)
-    cpu.registers.h = 0x7F;
-    cpu.pc = 0x00; // Reset PC to run the same instruction again
-    // (Memory still contains 0xCB, 0x7C)
-
-    cpu.step(&mut bus);
-    let z_flag_clear = cpu.registers.f.zero;
-    println!("H=0x7F | Zero Flag: {} (Expected: true)", z_flag_clear);
-
-    if !z_flag_set && z_flag_clear {
-        println!("✅ SUCCESS: Prefix CB decoding and BIT logic working.");
-    } else {
-        println!("❌ FAIL: Check your logic.");
+    for (i, byte) in bootrom.iter().enumerate() {
+        bus.write_byte(i as u16, *byte);
     }
 
-    // debug unknown instruction
+    println!(
+        "Bootrom loaded {} bytes. Starting execution...",
+        bootrom.len()
+    );
+
+    loop {
+        cpu.step(&mut bus);
+
+        if cpu.pc >= 0x0100 {
+            println!("Bootrom execution finished!");
+            break;
+        }
+    }
+
+    let mut logo_found = false;
+    for i in 0x8004..0x8014 {
+        if bus.read_byte(i) != 0 {
+            logo_found = true;
+            break;
+        }
+    }
+
+    if logo_found {
+        println!("Logo data was found!");
+    } else {
+        println!("Logo data not found!");
+    }
+
+    Ok(())
 }
