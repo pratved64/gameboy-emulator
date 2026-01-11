@@ -204,7 +204,7 @@ impl Instruction {
             0x83 => Some(Instruction::ADD(ArithmeticTarget::E)),
             0x84 => Some(Instruction::ADD(ArithmeticTarget::H)),
             0x85 => Some(Instruction::ADD(ArithmeticTarget::L)),
-            // 0x86 is ADD A, (HL)
+            0x86 => Some(Instruction::ADD(ArithmeticTarget::HL)),
             0x87 => Some(Instruction::ADD(ArithmeticTarget::A)),
 
             0x90 => Some(Instruction::SUB(ArithmeticTarget::B)),
