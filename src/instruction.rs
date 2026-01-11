@@ -22,6 +22,9 @@ pub enum Instruction {
     RLA,
     BIT(ArithmeticTarget),
     PREFIX,
+    NOP,
+    DI,
+    EI,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -70,6 +73,10 @@ pub enum StackTarget {
 impl Instruction {
     pub fn from_byte(byte: u8) -> Option<Instruction> {
         match byte {
+            0x00 => Some(Instruction::NOP),
+            0xF3 => Some(Instruction::DI),
+            0xFB => Some(Instruction::EI),
+
             0x01 => Some(Instruction::LD16(Load16Target::BC)),
             0x11 => Some(Instruction::LD16(Load16Target::DE)),
             0x21 => Some(Instruction::LD16(Load16Target::HL)),

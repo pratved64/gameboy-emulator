@@ -2,29 +2,22 @@ use crate::ppu::PPU;
 
 pub struct MemoryBus {
     memory: [u8; 0x10000],
-    ppu: PPU,
+    pub ppu: PPU,
 }
 
 impl MemoryBus {
     pub fn new() -> Self {
         MemoryBus {
             memory: [0; 0x10000],
-            ppu: PPU { vram: [0; 0x2000] },
+            ppu: PPU::new(),
         }
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize],
-            0xFF44 => {
-                println!("Reading LY: 0x90");
-                0x90
-            }
-            0xFF00..=0xFF7F => {
-                println!("Read from 0x{:x}", address);
-                0x000000
-            }
-
+            0xFF44 => self.ppu.ly,
+            0xFF00..=0xFF7F => self.memory[address as usize],
             _ => self.memory[address as usize],
         }
     }
@@ -32,7 +25,8 @@ impl MemoryBus {
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize] = byte,
-            0xFF00..=0xFF7F => println!("Write to 0x{:x}", address),
+            0xFF44 => {}
+            0xFF00..=0xFF7F => self.memory[address as usize] = byte,
             _ => self.memory[address as usize] = byte,
         }
     }

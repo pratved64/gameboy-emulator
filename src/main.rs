@@ -5,6 +5,8 @@ mod ppu;
 
 use bus::MemoryBus;
 use cpu::CPU;
+use minifb::{Window, WindowOptions};
+use ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::error::Error;
 use std::fs;
 
@@ -39,34 +41,37 @@ fn main() -> Result<(), Box<dyn Error>> {
         gamerom.len()
     );
 
+    let mut window = Window::new(
+        "Gameboy",
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        WindowOptions::default(),
+    )
+    .unwrap();
+
     let mut executed_count = 0;
 
-    loop {
+    //loop {}
+
+    println!("FF50 (boot disable) = {:#04x}", bus.read_byte(0xFF50));
+
+    while window.is_open() {
         cpu.step(&mut bus);
         executed_count += 1;
-        if cpu.pc >= 0x0100 {
-            println!("Bootrom execution finished!");
-            break;
-        }
+        bus.ppu.tick(bus.read_byte(0xFF40));
+        // if cpu.pc >= 0x0100 {
+        //     println!("BootROM execution completed!");
+        //     break;
+        // }
         if executed_count > 200_000 {
-            println!("Exceeded 50,000 steps!");
+            println!("Exceeded 200,000 steps!");
             println!("PC: {:#06x}", cpu.pc);
             break;
         }
-    }
 
-    let mut logo_found = false;
-    for i in 0x8004..0x8014 {
-        if bus.read_byte(i) != 0 {
-            logo_found = true;
-            break;
-        }
-    }
-
-    if logo_found {
-        println!("Logo data was found!");
-    } else {
-        println!("Logo data not found!");
+        window
+            .update_with_buffer(&bus.ppu.buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
+            .unwrap();
     }
 
     Ok(())

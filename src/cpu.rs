@@ -8,6 +8,7 @@ pub struct CPU {
     pub registers: Registers,
     pub pc: u16,
     pub sp: u16,
+    pub ime: bool,
 }
 
 impl CPU {
@@ -25,6 +26,7 @@ impl CPU {
             },
             pc: 0,
             sp: 0,
+            ime: true,
         }
     }
 
@@ -421,6 +423,9 @@ impl CPU {
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = true;
             }
+
+            Instruction::DI => self.ime = false,
+            Instruction::EI => self.ime = true,
 
             _ => {} // TODO: Support more instructions
         }
