@@ -16,9 +16,13 @@ impl PPU {
         }
     }
 
-    pub fn tick(&mut self, lcdc: u8) {
-        self.render_background(lcdc);
+    pub fn tick(&mut self, lcdc: u8, scx: u8, scy: u8) {
         self.ly = self.ly.wrapping_add(1);
+
+        if self.ly == 144 {
+            self.render_background(lcdc, scx, scy);
+        }
+
         if self.ly >= 154 {
             self.ly = 0;
         }
@@ -29,14 +33,10 @@ impl PPU {
         self.vram.into_iter().filter(|&x| x == 0x00).collect()
     }
 
-    fn render_background(&mut self, lcdc: u8) {
+    fn render_background(&mut self, lcdc: u8, scx: u8, scy: u8) {
         if (lcdc & 0x80) == 0 {
-            self.buffer.fill(0xFFFFFF)
+            return;
         }
-
-        // Read from FF42 and FF43 later
-        let scx = 0;
-        let scy = 0;
 
         let use_8k = (lcdc & 0x10) != 0;
         let bg_map_base = if (lcdc & 0x08) != 0 { 0x1C00 } else { 0x1800 };
@@ -61,9 +61,9 @@ impl PPU {
                 };
 
                 let line = (map_y & 7) as usize;
-                if tile_addr + line * 2 + 1 >= 0x2000 {
-                    continue;
-                }
+                // if tile_addr + line * 2 + 1 >= 0x2000 {
+                //     continue;
+                // }
 
                 let b1 = self.vram[tile_addr + line * 2];
                 let b2 = self.vram[tile_addr + line * 2 + 1];

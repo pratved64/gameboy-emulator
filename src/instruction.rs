@@ -1,9 +1,13 @@
 pub enum Instruction {
     ADD(ArithmeticTarget),
+    ADC(ArithmeticTarget),
     SUB(ArithmeticTarget),
     SBC(ArithmeticTarget),
     CP(ArithmeticTarget),
     XOR(ArithmeticTarget),
+    OR(ArithmeticTarget),
+    AND(ArithmeticTarget),
+    CPL,
     INC(ArithmeticTarget),
     DEC(ArithmeticTarget),
     RL(ArithmeticTarget), // Prefix Opcode
@@ -18,13 +22,18 @@ pub enum Instruction {
     CALL(JumpTest),
     RET(JumpTest),
     LD_HL_DEC_A,
+    LD_A_HL_DEC,
     LD_HL_INC_A,
+    LD_A_HL_INC,
+    RLCA,
     RLA,
     BIT(ArithmeticTarget),
     PREFIX,
     NOP,
     DI,
     EI,
+    RST(u16),
+    SWAP(ArithmeticTarget),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,8 +93,12 @@ impl Instruction {
 
             0x22 => Some(Instruction::LD_HL_INC_A),
             0x32 => Some(Instruction::LD_HL_DEC_A),
+            0x2A => Some(Instruction::LD_A_HL_INC),
+            0x3A => Some(Instruction::LD_A_HL_DEC),
 
+            0x07 => Some(Instruction::RLCA),
             0x17 => Some(Instruction::RLA),
+            0x2F => Some(Instruction::CPL),
 
             0x18 => Some(Instruction::JR(JumpTest::Always)),
             0x20 => Some(Instruction::JR(JumpTest::NotZero)),
@@ -109,6 +122,7 @@ impl Instruction {
             0x2E => Some(Instruction::LD(ArithmeticTarget::L, ArithmeticTarget::D8)),
             0x3E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::D8)),
             0x06 => Some(Instruction::LD(ArithmeticTarget::B, ArithmeticTarget::D8)),
+            0x26 => Some(Instruction::LD(ArithmeticTarget::H, ArithmeticTarget::D8)),
 
             0x02 => Some(Instruction::LD(ArithmeticTarget::BC, ArithmeticTarget::A)),
             0x0A => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::BC)),
@@ -177,6 +191,7 @@ impl Instruction {
             0x75 => Some(Instruction::LD(ArithmeticTarget::HL, ArithmeticTarget::L)),
             // 0x76 is HALT
             0x77 => Some(Instruction::LD(ArithmeticTarget::HL, ArithmeticTarget::A)),
+            0x36 => Some(Instruction::LD(ArithmeticTarget::HL, ArithmeticTarget::D8)),
 
             0x78 => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::B)),
             0x79 => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::C)),
@@ -184,10 +199,11 @@ impl Instruction {
             0x7B => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::E)),
             0x7C => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::H)),
             0x7D => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::L)),
-            // 0x7E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::HL)),
+            0x7E => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::HL)),
             0x7F => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::A)),
 
             0xEA => Some(Instruction::LD(ArithmeticTarget::D16, ArithmeticTarget::A)),
+            0xFA => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::D16)),
 
             0x3C => Some(Instruction::INC(ArithmeticTarget::A)),
             0x04 => Some(Instruction::INC(ArithmeticTarget::B)),
@@ -213,6 +229,16 @@ impl Instruction {
             0x85 => Some(Instruction::ADD(ArithmeticTarget::L)),
             0x86 => Some(Instruction::ADD(ArithmeticTarget::HL)),
             0x87 => Some(Instruction::ADD(ArithmeticTarget::A)),
+
+            0x88 => Some(Instruction::ADC(ArithmeticTarget::B)),
+            0x89 => Some(Instruction::ADC(ArithmeticTarget::C)),
+            0x8A => Some(Instruction::ADC(ArithmeticTarget::D)),
+            0x8B => Some(Instruction::ADC(ArithmeticTarget::E)),
+            0x8C => Some(Instruction::ADC(ArithmeticTarget::H)),
+            0x8D => Some(Instruction::ADC(ArithmeticTarget::L)),
+            0x8E => Some(Instruction::ADC(ArithmeticTarget::HL)),
+            0x8F => Some(Instruction::ADC(ArithmeticTarget::A)),
+            0xCE => Some(Instruction::ADC(ArithmeticTarget::D8)),
 
             0x90 => Some(Instruction::SUB(ArithmeticTarget::B)),
             0x91 => Some(Instruction::SUB(ArithmeticTarget::C)),
@@ -248,12 +274,33 @@ impl Instruction {
             0xC2 => Some(Instruction::JP(JumpTest::NotZero)),
             0xCA => Some(Instruction::JP(JumpTest::Zero)),
 
+            0xB0 => Some(Instruction::OR(ArithmeticTarget::B)),
+            0xB1 => Some(Instruction::OR(ArithmeticTarget::C)),
+            0xB2 => Some(Instruction::OR(ArithmeticTarget::D)),
+            0xB3 => Some(Instruction::OR(ArithmeticTarget::E)),
+            0xB4 => Some(Instruction::OR(ArithmeticTarget::H)),
+            0xB5 => Some(Instruction::OR(ArithmeticTarget::L)),
+            0xB6 => Some(Instruction::OR(ArithmeticTarget::HL)),
+            0xB7 => Some(Instruction::OR(ArithmeticTarget::A)),
+            0xF6 => Some(Instruction::OR(ArithmeticTarget::D8)),
+
+            0xA0 => Some(Instruction::AND(ArithmeticTarget::B)),
+            0xA1 => Some(Instruction::AND(ArithmeticTarget::C)),
+            0xA2 => Some(Instruction::AND(ArithmeticTarget::D)),
+            0xA3 => Some(Instruction::AND(ArithmeticTarget::E)),
+            0xA4 => Some(Instruction::AND(ArithmeticTarget::H)),
+            0xA5 => Some(Instruction::AND(ArithmeticTarget::L)),
+            0xA6 => Some(Instruction::AND(ArithmeticTarget::HL)),
+            0xA7 => Some(Instruction::AND(ArithmeticTarget::A)),
+            0xE6 => Some(Instruction::AND(ArithmeticTarget::D8)),
+
             0xA8 => Some(Instruction::XOR(ArithmeticTarget::B)),
             0xA9 => Some(Instruction::XOR(ArithmeticTarget::C)),
             0xAA => Some(Instruction::XOR(ArithmeticTarget::D)),
             0xAB => Some(Instruction::XOR(ArithmeticTarget::E)),
             0xAC => Some(Instruction::XOR(ArithmeticTarget::H)),
             0xAD => Some(Instruction::XOR(ArithmeticTarget::L)),
+            0xAE => Some(Instruction::XOR(ArithmeticTarget::HL)),
             0xAF => Some(Instruction::XOR(ArithmeticTarget::A)),
 
             0xC1 => Some(Instruction::POP(StackTarget::BC)),
@@ -283,6 +330,15 @@ impl Instruction {
             0xE2 => Some(Instruction::LD(ArithmeticTarget::FFC, ArithmeticTarget::A)),
             0xF2 => Some(Instruction::LD(ArithmeticTarget::A, ArithmeticTarget::FFC)),
 
+            0xC7 => Some(Instruction::RST(0x0000)),
+            0xCF => Some(Instruction::RST(0x0008)),
+            0xD7 => Some(Instruction::RST(0x0010)),
+            0xDF => Some(Instruction::RST(0x0018)),
+            0xE7 => Some(Instruction::RST(0x0020)),
+            0xF7 => Some(Instruction::RST(0x0030)),
+            0xEF => Some(Instruction::RST(0x0028)),
+            0xFF => Some(Instruction::RST(0x0038)),
+
             0xCB => Some(Instruction::PREFIX),
             _ => None,
         }
@@ -292,6 +348,15 @@ impl Instruction {
         match byte {
             0x7C => Some(Instruction::BIT(ArithmeticTarget::H)),
             0x11 => Some(Instruction::RL(ArithmeticTarget::C)),
+
+            0x30 => Some(Instruction::SWAP(ArithmeticTarget::B)),
+            0x31 => Some(Instruction::SWAP(ArithmeticTarget::C)),
+            0x32 => Some(Instruction::SWAP(ArithmeticTarget::D)),
+            0x33 => Some(Instruction::SWAP(ArithmeticTarget::E)),
+            0x34 => Some(Instruction::SWAP(ArithmeticTarget::H)),
+            0x35 => Some(Instruction::SWAP(ArithmeticTarget::L)),
+            0x36 => Some(Instruction::SWAP(ArithmeticTarget::HL)),
+            0x37 => Some(Instruction::SWAP(ArithmeticTarget::A)),
             _ => None,
         }
     }

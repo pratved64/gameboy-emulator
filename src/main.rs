@@ -51,27 +51,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut executed_count = 0;
 
-    //loop {}
-
     println!("FF50 (boot disable) = {:#04x}", bus.read_byte(0xFF50));
 
     while window.is_open() {
         cpu.step(&mut bus);
         executed_count += 1;
-        bus.ppu.tick(bus.read_byte(0xFF40));
         // if cpu.pc >= 0x0100 {
         //     println!("BootROM execution completed!");
         //     break;
         // }
-        if executed_count > 200_000 {
-            println!("Exceeded 200,000 steps!");
-            println!("PC: {:#06x}", cpu.pc);
-            break;
+        if executed_count % 70224 == 0 {
+            println!("Executed frame: {}", executed_count % 70224);
+            bus.ppu.tick(
+                bus.read_byte(0xFF40),
+                bus.read_byte(0xFF43),
+                bus.read_byte(0xFF42),
+            );
+            window
+                .update_with_buffer(&bus.ppu.buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
+                .unwrap();
         }
-
-        window
-            .update_with_buffer(&bus.ppu.buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
-            .unwrap();
     }
 
     Ok(())

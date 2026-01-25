@@ -53,6 +53,27 @@ impl CPU {
                 self.registers.a = result;
             }
 
+            Instruction::ADC(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
+                    _ => panic!("Unknown target for SUB!"),
+                };
+                let result = self.adc(value);
+                self.registers.a = result;
+            }
+
             Instruction::SUB(target) => {
                 let value = match target {
                     ArithmeticTarget::A => self.registers.a,
@@ -143,6 +164,18 @@ impl CPU {
                 self.write_reg(target, new_value);
             }
 
+            Instruction::RLCA => {
+                let a = self.registers.a;
+                let top_bit = a >> 7;
+                let new_value = (a << 1) | top_bit;
+                self.registers.a = new_value;
+
+                self.registers.f.carry = top_bit == 1;
+                self.registers.f.zero = false;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = false;
+            }
+
             // Rotate the contents of register A to the left, through the carry (CY) flag.
             // That is, the contents of bit 0 are copied to bit 1, and the previous contents
             // of bit 1 (before the copy operation) are copied to bit 2.
@@ -159,6 +192,8 @@ impl CPU {
                 self.registers.f.half_carry = false;
                 self.write_reg(ArithmeticTarget::A, new_value);
             }
+
+            Instruction::CPL => self.registers.a = !self.registers.a,
 
             Instruction::JP(test) => {
                 let jump_condition = match test {
@@ -201,6 +236,56 @@ impl CPU {
                 self.registers.f.zero = result == 0;
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = false;
+                self.registers.f.carry = false;
+            }
+
+            Instruction::OR(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
+                    _ => panic!("Unknown target for OR!"),
+                };
+
+                let result = self.registers.a | value;
+                self.registers.f.zero = result == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = false;
+                self.registers.f.carry = false;
+            }
+
+            Instruction::AND(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    ArithmeticTarget::D8 => {
+                        let d8_val = bus.read_byte(self.pc);
+                        self.pc = self.pc.wrapping_add(1);
+                        d8_val
+                    }
+                    _ => panic!("Unknown target for AND!"),
+                };
+
+                let result = self.registers.a & value;
+                self.registers.f.zero = result == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = true;
                 self.registers.f.carry = false;
             }
 
@@ -344,6 +429,20 @@ impl CPU {
                 self.registers.set_hl(address.wrapping_add(1));
             }
 
+            Instruction::LD_A_HL_DEC => {
+                let address = self.registers.get_hl();
+                let value = bus.read_byte(address);
+                self.registers.a = value;
+                self.registers.set_hl(address.wrapping_sub(1));
+            }
+
+            Instruction::LD_A_HL_INC => {
+                let address = self.registers.get_hl();
+                let value = bus.read_byte(address);
+                self.registers.a = value;
+                self.registers.set_hl(address.wrapping_add(1));
+            }
+
             Instruction::JR(test) => {
                 let offset = bus.read_byte(self.pc) as i8;
                 self.pc = self.pc.wrapping_add(1);
@@ -411,6 +510,40 @@ impl CPU {
                     .set_hl(self.registers.get_hl().wrapping_sub(1)),
                 Load16Target::SP => self.sp = self.sp.wrapping_sub(1),
             },
+
+            Instruction::SWAP(target) => {
+                let value = match target {
+                    ArithmeticTarget::A => self.registers.a,
+                    ArithmeticTarget::B => self.registers.b,
+                    ArithmeticTarget::C => self.registers.c,
+                    ArithmeticTarget::D => self.registers.d,
+                    ArithmeticTarget::E => self.registers.e,
+                    ArithmeticTarget::H => self.registers.h,
+                    ArithmeticTarget::L => self.registers.l,
+                    ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
+                    _ => panic!("Unknown read target for SWAP!"),
+                };
+                let top = (value & 0xF0) >> 4;
+                let bot = value & 0x0F;
+                let new_value = (bot << 4) | top;
+
+                self.registers.f.zero = new_value == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = false;
+                self.registers.f.carry = false;
+
+                match target {
+                    ArithmeticTarget::A => self.registers.a = new_value,
+                    ArithmeticTarget::B => self.registers.b = new_value,
+                    ArithmeticTarget::C => self.registers.c = new_value,
+                    ArithmeticTarget::D => self.registers.d = new_value,
+                    ArithmeticTarget::E => self.registers.e = new_value,
+                    ArithmeticTarget::H => self.registers.h = new_value,
+                    ArithmeticTarget::L => self.registers.l = new_value,
+                    ArithmeticTarget::HL => bus.write_byte(self.registers.get_hl(), new_value),
+                    _ => panic!("Unknown write target for SWAP!"),
+                };
+            }
 
             Instruction::BIT(target) => {
                 let value = match target {
@@ -495,6 +628,21 @@ impl CPU {
         result
     }
 
+    fn adc(&mut self, value: u8) -> u8 {
+        let a = self.registers.a;
+        let carry = if self.registers.f.carry { 1 } else { 0 };
+
+        let sum = a as u16 + value as u16 + carry as u16;
+        let result = sum as u8;
+
+        self.registers.f.zero = result == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.carry = sum > 0xFF;
+        self.registers.f.half_carry = ((a & 0xF) + (value & 0xF) + carry) > 0xF;
+
+        result
+    }
+
     fn push(&mut self, bus: &mut MemoryBus, value: u16) {
         self.sp = self.sp.wrapping_sub(2);
         bus.write_word(self.sp, value);
@@ -520,6 +668,7 @@ impl CPU {
                 if let Some(cb_inst) = Instruction::from_cb_byte(cb_byte) {
                     self.execute(cb_inst, bus);
                 } else {
+                    println!("Program Counter: {}", self.pc);
                     panic!("Unknown CB Instruction: 0xCB{:02x}", cb_byte);
                 }
             }
