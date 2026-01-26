@@ -462,13 +462,13 @@ impl CPU {
 
                 let new_value = value.wrapping_add(1);
 
-                println!(
-                    "INC {:?} | Old: {} | New: {} | ZeroFlag: {}",
-                    target,
-                    value,
-                    new_value,
-                    new_value == 0,
-                );
+                // println!(
+                //     "INC {:?} | Old: {} | New: {} | ZeroFlag: {}",
+                //     target,
+                //     value,
+                //     new_value,
+                //     new_value == 0,
+                // );
                 self.registers.f.zero = new_value == 0;
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = (value & 0xF) == 0xF;
@@ -678,6 +678,34 @@ impl CPU {
                 panic!("Unknown instruction from byte: 0x{:02X}", instruction_byte)
             }
         }
+    }
+
+    pub fn handle_interrupts(&mut self, bus: &mut MemoryBus) {
+        if !self.ime {
+            return;
+        }
+
+        let ie = bus.read_byte(0xFFFF);
+        let if_reg = bus.read_byte(0xFF0F);
+        let pending = ie & if_reg;
+
+        if pending > 0 {
+            // VBLANK
+            if pending & 0x01 != 0 {
+                self.service_interrupt(bus, 0, 0x0040);
+            }
+        }
+    }
+
+    fn service_interrupt(&mut self, bus: &mut MemoryBus, interrupt_bit: u8, addr: u16) {
+        self.ime = false;
+        let mut if_reg = bus.read_byte(0xFF0F);
+
+        if_reg &= !(1 << interrupt_bit);
+        bus.write_byte(0xFF0F, if_reg);
+
+        self.push(bus, self.pc);
+        self.pc = addr;
     }
 }
 

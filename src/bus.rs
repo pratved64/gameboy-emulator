@@ -25,8 +25,7 @@ impl MemoryBus {
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize] = byte,
-            0xFF44 => {}
-            0xFF00..=0xFF7F => self.memory[address as usize] = byte,
+            0xFF44 => self.ppu.ly = 0,
             _ => self.memory[address as usize] = byte,
         }
     }

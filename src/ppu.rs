@@ -5,6 +5,7 @@ pub struct PPU {
     pub vram: [u8; 0x2000],
     pub buffer: [u32; SCREEN_HEIGHT * SCREEN_WIDTH],
     pub ly: u8,
+    pub bg_map_base: usize,
 }
 
 impl PPU {
@@ -13,33 +14,49 @@ impl PPU {
             vram: [0; 0x2000],
             buffer: [0; SCREEN_HEIGHT * SCREEN_WIDTH],
             ly: 0,
+            bg_map_base: 0x1800,
         }
     }
 
-    pub fn tick(&mut self, lcdc: u8, scx: u8, scy: u8) {
+    pub fn tick(&mut self, lcdc: u8, scx: u8, scy: u8) -> bool {
         self.ly = self.ly.wrapping_add(1);
+        let mut vblank = false;
 
         if self.ly == 144 {
             self.render_background(lcdc, scx, scy);
+            vblank = true;
         }
 
         if self.ly >= 154 {
             self.ly = 0;
         }
         // println!("LCDC = {:#04x}", lcdc);
+        // println!("LY: {}", self.ly);
+
+        vblank
     }
 
-    fn get_non_white(&self) -> Vec<u8> {
-        self.vram.into_iter().filter(|&x| x == 0x00).collect()
+    pub fn dump_vram(&self) {
+        println!("- - VRAM DUMP - -");
+        for r in 0..32 {
+            println!(
+                "{:02X?}",
+                &self.vram[self.bg_map_base + r * 32..self.bg_map_base + (r + 1) * 32]
+            );
+        }
     }
 
     fn render_background(&mut self, lcdc: u8, scx: u8, scy: u8) {
         if (lcdc & 0x80) == 0 {
+            self.buffer.fill(0xFFFFFF);
             return;
         }
 
         let use_8k = (lcdc & 0x10) != 0;
-        let bg_map_base = if (lcdc & 0x08) != 0 { 0x1C00 } else { 0x1800 };
+        self.bg_map_base = if (lcdc & 0x08) != 0 { 0x1C00 } else { 0x1800 };
+
+        // let scx = 0;
+        // let scy = 0;
 
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
@@ -51,7 +68,7 @@ impl PPU {
 
                 let tile_idx = tile_row * 32 + tile_col;
 
-                let tile_id = self.vram[bg_map_base + tile_idx];
+                let tile_id = self.vram[self.bg_map_base + tile_idx];
 
                 let tile_addr = if use_8k {
                     tile_id as usize * 16
@@ -61,17 +78,29 @@ impl PPU {
                 };
 
                 let line = (map_y & 7) as usize;
-                // if tile_addr + line * 2 + 1 >= 0x2000 {
-                //     continue;
-                // }
+                if tile_addr + line * 2 + 1 >= 0x2000 {
+                    continue;
+                }
 
                 let b1 = self.vram[tile_addr + line * 2];
                 let b2 = self.vram[tile_addr + line * 2 + 1];
 
-                let bit_idx = 7 - (map_x & 7);
+                let bit_idx = 7 - ((map_x & 7) as usize);
                 let low_bit = (b1 >> bit_idx) & 1;
                 let high_bit = (b2 >> bit_idx) & 1;
                 let color_val = (high_bit << 1) | low_bit;
+
+                if x == 80 && y == 72 && (lcdc & 0x80) != 0 {
+                    // println!("--- PPU DEBUG (Center Pixel) ---");
+                    // println!("SCX: {} | SCY: {}", scx, scy);
+                    // println!("Map X: {} | Map Y: {}", map_x, map_y);
+                    // println!("Tile Col: {} | Tile Row: {}", tile_col, tile_row);
+                    // println!(
+                    //     "Calculated Index: {} | Value at Index: {:#02x}",
+                    //     tile_idx,
+                    //     self.vram[self.bg_map_base + tile_idx]
+                    // );
+                }
 
                 let color = match color_val {
                     0 => 0xFFFFFF,
@@ -86,7 +115,7 @@ impl PPU {
         }
     }
 
-    fn debug_draw_tiles(&mut self) {
+    pub fn debug_draw_tiles(&mut self) {
         let mut xdraw = 0;
         let mut ydraw = 0;
 

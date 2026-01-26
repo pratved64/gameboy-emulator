@@ -49,27 +49,59 @@ fn main() -> Result<(), Box<dyn Error>> {
     )
     .unwrap();
 
-    let mut executed_count = 0;
+    let mut executed_count: u32 = 0;
 
     println!("FF50 (boot disable) = {:#04x}", bus.read_byte(0xFF50));
 
+    let mut dumped = false;
+
+    let mut scanline_counter = 0;
+
     while window.is_open() {
+        // --- TRACE START ---
+        // Kept your trace filter so logs don't explode.
+        // This only logs the critical handover from Boot ROM to Tetris.
+        let opcode = bus.read_byte(cpu.pc);
+        println!(
+            "PC: {:#04x} | Op: {:#02x} | SP: {:#04x} | A: {:#02x} | B: {:#02x} | HL: {:#04x}",
+            cpu.pc,
+            opcode,
+            cpu.sp,
+            cpu.registers.a,
+            cpu.registers.b,
+            cpu.registers.get_hl()
+        );
+        // --- TRACE END ---
+
+        cpu.handle_interrupts(&mut bus);
         cpu.step(&mut bus);
         executed_count += 1;
-        // if cpu.pc >= 0x0100 {
-        //     println!("BootROM execution completed!");
-        //     break;
-        // }
-        if executed_count % 70224 == 0 {
-            println!("Executed frame: {}", executed_count % 70224);
-            bus.ppu.tick(
+
+        scanline_counter += 1;
+
+        if scanline_counter >= 114 {
+            scanline_counter = 0;
+
+            let vblank_triggered = bus.ppu.tick(
                 bus.read_byte(0xFF40),
                 bus.read_byte(0xFF43),
                 bus.read_byte(0xFF42),
             );
-            window
-                .update_with_buffer(&bus.ppu.buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
-                .unwrap();
+
+            if vblank_triggered {
+                let mut if_reg = bus.read_byte(0xFF0F);
+                if_reg |= 1;
+                bus.write_byte(0xFF0F, if_reg);
+
+                window
+                    .update_with_buffer(&bus.ppu.buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
+                    .unwrap();
+            }
+        }
+
+        if executed_count > 200_000 && !dumped {
+            bus.ppu.dump_vram();
+            dumped = true;
         }
     }
 
