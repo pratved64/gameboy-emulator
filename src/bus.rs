@@ -3,6 +3,7 @@ use crate::ppu::PPU;
 pub struct MemoryBus {
     memory: [u8; 0x10000],
     pub ppu: PPU,
+    pub boot_enabled: bool,
 }
 
 impl MemoryBus {
@@ -10,6 +11,7 @@ impl MemoryBus {
         MemoryBus {
             memory: [0; 0x10000],
             ppu: PPU::new(),
+            boot_enabled: true,
         }
     }
 
@@ -26,6 +28,12 @@ impl MemoryBus {
         match address {
             0x8000..=0x9FFF => self.ppu.vram[(address - 0x8000) as usize] = byte,
             0xFF44 => self.ppu.ly = 0,
+            0xFF50 => {
+                if byte != 0 && self.boot_enabled {
+                    println!("BOOTROM disabled, switching to GameROM");
+                    self.boot_enabled = false;
+                }
+            }
             _ => self.memory[address as usize] = byte,
         }
     }

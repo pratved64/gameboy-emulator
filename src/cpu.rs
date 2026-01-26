@@ -414,6 +414,12 @@ impl CPU {
                 }
             }
 
+            Instruction::RETI => {
+                let top = self.pop(bus);
+                self.pc = top;
+                self.ime = true;
+            }
+
             Instruction::LD_HL_DEC_A => {
                 let address = self.registers.get_hl();
                 let value = self.registers.a;

@@ -10,10 +10,6 @@ use ppu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::error::Error;
 use std::fs;
 
-// Bootrom maybe working!
-// TODO: Test the emulator with a gb ROM and see what happens
-// Expected: The PC should continue past 0x0100 and not get stuck in this infinite loop!
-
 fn main() -> Result<(), Box<dyn Error>> {
     let mut bus = MemoryBus::new();
     let mut cpu = CPU::new();
@@ -24,6 +20,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Warning: could not find gamerom, loading dummy rom!");
         vec![0; 0x8000]
     });
+
+    let game_header = &gamerom[0..0x100];
+    let mut bootrom_finished = false;
 
     for (i, byte) in gamerom.iter().enumerate() {
         if i < 0x10000 {
@@ -62,22 +61,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Kept your trace filter so logs don't explode.
         // This only logs the critical handover from Boot ROM to Tetris.
         let opcode = bus.read_byte(cpu.pc);
-        println!(
-            "PC: {:#04x} | Op: {:#02x} | SP: {:#04x} | A: {:#02x} | B: {:#02x} | HL: {:#04x}",
-            cpu.pc,
-            opcode,
-            cpu.sp,
-            cpu.registers.a,
-            cpu.registers.b,
-            cpu.registers.get_hl()
-        );
+        // println!(
+        //     "PC: {:#04x} | Op: {:#02x} | SP: {:#04x} | A: {:#02x} | B: {:#02x} | HL: {:#04x} | FZ: {}",
+        //     cpu.pc,
+        //     opcode,
+        //     cpu.sp,
+        //     cpu.registers.a,
+        //     cpu.registers.b,
+        //     cpu.registers.get_hl(),
+        //     cpu.registers.f.zero,
+        // );
         // --- TRACE END ---
 
         cpu.handle_interrupts(&mut bus);
         cpu.step(&mut bus);
         executed_count += 1;
-
         scanline_counter += 1;
+        if bus.ppu.ly == 144 {
+            // Only print once per frame to avoid spamming the console
+            let opcode = bus.read_byte(cpu.pc);
+            // Peek at the NEXT byte (the operand) to see what we are comparing against
+            let operand = bus.read_byte(cpu.pc.wrapping_add(1));
+            //
+            // println!(
+            //     "LY=144 HIT! | PC:{:#04x} | Op:{:#02x} | Operand:{:#02x} | A:{:#02x} | Z-Flag:{}",
+            //     cpu.pc,
+            //     opcode,
+            //     operand,
+            //     cpu.registers.a,
+            //     cpu.registers.f.zero
+            // );
+        }
+
+        if !bootrom_finished && bus.boot_enabled {
+            println!("Unmapping BootROM, restoring GameROM header...");
+            for i in 0..0x100 {
+                bus.write_byte(i as u16, game_header[i]);
+            }
+            bootrom_finished = true;
+        }
 
         if scanline_counter >= 114 {
             scanline_counter = 0;

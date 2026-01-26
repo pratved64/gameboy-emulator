@@ -33,6 +33,7 @@ pub enum Instruction {
     DI,
     EI,
     RST(u16),
+    RETI,
     SWAP(ArithmeticTarget),
 }
 
@@ -85,6 +86,7 @@ impl Instruction {
             0x00 => Some(Instruction::NOP),
             0xF3 => Some(Instruction::DI),
             0xFB => Some(Instruction::EI),
+            0xD9 => Some(Instruction::RETI),
 
             0x01 => Some(Instruction::LD16(Load16Target::BC)),
             0x11 => Some(Instruction::LD16(Load16Target::DE)),
@@ -212,6 +214,7 @@ impl Instruction {
             0x1C => Some(Instruction::INC(ArithmeticTarget::E)),
             0x24 => Some(Instruction::INC(ArithmeticTarget::H)),
             0x2C => Some(Instruction::INC(ArithmeticTarget::L)),
+            0x34 => Some(Instruction::INC(ArithmeticTarget::HL)),
 
             0x3D => Some(Instruction::DEC(ArithmeticTarget::A)),
             0x05 => Some(Instruction::DEC(ArithmeticTarget::B)),
