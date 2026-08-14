@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // );
         }
 
-        if !bootrom_finished && bus.boot_enabled {
+        if !bootrom_finished && !bus.boot_enabled {
             println!("Unmapping BootROM, restoring GameROM header...");
             for i in 0..0x100 {
                 bus.write_byte(i as u16, game_header[i]);

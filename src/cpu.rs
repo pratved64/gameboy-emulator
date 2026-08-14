@@ -161,7 +161,7 @@ impl CPU {
                 self.registers.f.zero = new_value == 0;
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = false;
-                self.write_reg(target, new_value);
+                self.write_reg(bus, target, new_value);
             }
 
             Instruction::RLCA => {
@@ -190,7 +190,7 @@ impl CPU {
                 self.registers.f.zero = false;
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = false;
-                self.write_reg(ArithmeticTarget::A, new_value);
+                self.write_reg(bus, ArithmeticTarget::A, new_value);
             }
 
             Instruction::CPL => self.registers.a = !self.registers.a,
@@ -346,7 +346,7 @@ impl CPU {
                     ArithmeticTarget::DE => bus.write_byte(self.registers.get_de(), load_value),
                     ArithmeticTarget::D16 => {
                         let address = bus.read_word(self.pc);
-                        self.pc = self.pc.wrapping_add(1);
+                        self.pc = self.pc.wrapping_add(2);
                         bus.write_byte(address, load_value);
                     }
                     _ => panic!("Unknown WRITE target for LD!"),
@@ -464,7 +464,7 @@ impl CPU {
             }
 
             Instruction::INC(target) => {
-                let value = self.read_reg(&target);
+                let value = self.read_reg(bus, &target);
 
                 let new_value = value.wrapping_add(1);
 
@@ -479,16 +479,16 @@ impl CPU {
                 self.registers.f.subtract = false;
                 self.registers.f.half_carry = (value & 0xF) == 0xF;
 
-                self.write_reg(target, new_value);
+                self.write_reg(bus, target, new_value);
             }
 
             Instruction::DEC(target) => {
-                let value = self.read_reg(&target);
+                let value = self.read_reg(bus, &target);
                 let new_value = value.wrapping_sub(1);
                 self.registers.f.zero = new_value == 0;
                 self.registers.f.subtract = true;
                 self.registers.f.half_carry = (value & 0xF) == 0;
-                self.write_reg(target, new_value);
+                self.write_reg(bus, target, new_value);
             }
 
             Instruction::INC16(target) => match target {
@@ -570,7 +570,7 @@ impl CPU {
         }
     }
 
-    fn read_reg(&self, target: &ArithmeticTarget) -> u8 {
+    fn read_reg(&self, bus: &MemoryBus, target: &ArithmeticTarget) -> u8 {
         match target {
             ArithmeticTarget::A => self.registers.a,
             ArithmeticTarget::B => self.registers.b,
@@ -579,15 +579,12 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e,
             ArithmeticTarget::H => self.registers.h,
             ArithmeticTarget::L => self.registers.l,
-            ArithmeticTarget::HL => {
-                println!("Reading from HL using read_reg!");
-                0x000000
-            }
+            ArithmeticTarget::HL => bus.read_byte(self.registers.get_hl()),
             _ => panic!("Trying to read from unknown register!"),
         }
     }
 
-    fn write_reg(&mut self, target: ArithmeticTarget, value: u8) {
+    fn write_reg(&mut self, bus: &mut MemoryBus, target: ArithmeticTarget, value: u8) {
         match target {
             ArithmeticTarget::A => self.registers.a = value,
             ArithmeticTarget::B => self.registers.b = value,
@@ -596,7 +593,7 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e = value,
             ArithmeticTarget::H => self.registers.h = value,
             ArithmeticTarget::L => self.registers.l = value,
-            ArithmeticTarget::HL => println!("Writing to HL register from write_reg!"),
+            ArithmeticTarget::HL => bus.write_byte(self.registers.get_hl(), value),
             _ => panic!("Trying to write to unknown register!"),
         }
     }
